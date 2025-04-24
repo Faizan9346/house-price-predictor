@@ -1,24 +1,27 @@
 import pickle
-from flask import Flask, render_template, request
+import os
 import warnings
+from flask import Flask, render_template, request
 
-# Suppress scikit-learn version warnings
+# Suppress version mismatch warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Load the trained model
-model = pickle.load(open('app/model.pkl', 'rb'))
+model = pickle.load(open("app/model.pkl", "rb"))
 
-# Initialize Flask app
+# Create Flask app
 app = Flask(__name__)
 
+# Homepage
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Prediction route
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        # Get input values from the form
+        # Get form values
         OverallQual = float(request.form['OverallQual'])
         GrLivArea = float(request.form['GrLivArea'])
         GarageCars = float(request.form['GarageCars'])
@@ -26,23 +29,19 @@ def predict():
         YearBuilt = float(request.form['YearBuilt'])
         FullBath = float(request.form['FullBath'])
 
-        # Features in same order as training
+        # Prepare input for model
         features = [OverallQual, GrLivArea, GarageCars, TotalBsmtSF, YearBuilt, FullBath]
+        prediction = model.predict([features])[0]
 
-        # Predict price in USD
-        price_usd = model.predict([features])[0]
+        # Convert to INR (₹)
+        prediction_inr = round(prediction * 84.12, 2)
 
-        # Convert to INR
-        conversion_rate = 83
-        price_inr = price_usd * conversion_rate
-
-        # Format with commas and two decimal places
-        formatted_price = f"{price_inr:,.2f}"
-
-        return render_template('index.html', prediction=formatted_price)
-
+        return render_template('index.html', prediction=f"₹{prediction_inr:,.2f}")
+    
     except Exception as e:
         return f"Error: {e}"
 
+# Run app
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
